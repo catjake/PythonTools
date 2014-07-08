@@ -1,0 +1,252 @@
+#!/usr/bin/env python
+
+import os
+from Tkinter import *
+from mFileDialog import *
+from get_file_tree import *
+from my_os_utils import FileUtils
+import my_lists
+from time import time
+
+def test():
+    app = EvaApplication()
+    app.go()
+
+#print out object contents to sdout
+def PrettyPrint(aList,add_cr=1):
+    for line in aList:
+        if add_cr: print line
+        else: print line,
+    pass
+
+class EvaApplication_gui(Frame): 
+    def __init__(self, master=None):
+        Frame.__init__(self, master) 
+        self.grid(sticky=N+S+E+W) 
+        self.rowconfigure(0, weight=1)
+        self.rowconfigure(1, weight=5) 
+        self.columnconfigure(0, weight=1) 
+        self.columnconfigure(1, weight=7) 
+        self.createWidgets()
+    
+    def open_file(self):
+        fd = selectDialog(self)
+        self.eva_file = fd.go(pattern=".*\.eva$")
+	print self.eva_file
+
+    def version_info(self):
+	print "pre alpha, the horse before the cart, whatever..."
+
+    def _create_menu_bar(self, root):
+        # create menubar
+        self.menubar = Menu(self)
+        # add evaprog_mb to menubar
+        self.evaprog_mb = Menu(self.menubar)
+        self.filter_ev_mb = Menu(self.evaprog_mb)
+        self.menubar.add_cascade(label="EvaProg", menu=self.evaprog_mb)
+        # create evaprog_mb for menubar 
+        self.evaprog_mb.add_command(label="Open Ev Application", command=self.open_file)
+        self.evaprog_mb.add_cascade(label="Filter Ev Objects", menu=self.filter_ev_mb, state=DISABLED)
+        self.evaprog_filter_menu_index = 2
+        self.evaprog_mb.add_separator()
+        self.evaprog_mb.add_command(label="Exit", command=self.quit)
+        # create help_mb for menubar 
+        helpmenu = Menu(self.menubar)
+        helpmenu.add_command(label="About", command =self.version_info)
+        # add help_mb to menubar
+        self.menubar.add_cascade(label="Help", menu=helpmenu)
+
+
+   
+    def _create_left_pane(self,root):
+	self.left_frame = Frame(root, name="left_frame")
+        self.left_frame_title = Label(self.left_frame,text="Query Results",anchor=NW)
+        self.left_frame_title.grid(row=0, column=0, sticky=NW)
+        # build list box
+	self.list_box = Listbox(self.left_frame)
+        self.list_box.grid(row=1, column=0, sticky=NW)
+        #tie scrollbar to list_box
+        yScroll = Scrollbar(self.left_frame, orient=VERTICAL)
+        yScroll.grid(row=1, column=1, sticky=N+S)
+        xScroll = Scrollbar(self.left_frame, orient=HORIZONTAL)
+        xScroll.grid(row=2, column=0, sticky=E+W)
+        self.list_box.configure(yscrollcommand=yScroll.set, xscrollcommand=xScroll.set)
+        yScroll.configure(command=self.list_box.yview)
+        xScroll.configure(command=self.list_box.xview)
+        # set frame into parent window grid
+        self.left_frame.grid(row=1, column=0, sticky=NW)
+        self.left_frame.columnconfigure(0, weight=1, minsize=150)
+
+    def _create_right_pane(self,root):
+	self.right_frame = Frame(root, name="right_frame")
+        self.right_frame_title = Label(self.right_frame,text="Display Contents",anchor=NW)
+        self.right_frame_title.grid(row=0,column=0,sticky=NW)
+        # build text window
+        self.text_window = Text(self.right_frame)
+        self.text_window.grid(row=1,column=0, sticky=NW)
+        #tie scrollbars to text_window
+        yScroll = Scrollbar(self.right_frame, orient=VERTICAL)
+        yScroll.grid(row=1, column=1, sticky=N+S)
+        xScroll = Scrollbar(self.right_frame, orient=HORIZONTAL)
+        xScroll.grid(row=2, column=0, sticky=E+W)
+        self.text_window.configure(yscrollcommand=yScroll.set, xscrollcommand=xScroll.set)
+        yScroll.configure(command=self.text_window.yview)
+        xScroll.configure(command=self.text_window.xview)
+        # set frame into parent window grid
+        self.right_frame.grid(row=1,column=1, sticky=NW)
+        self.right_frame.columnconfigure(0, weight=1, minsize=640)
+
+    def createWidgets(self):
+        top=self.winfo_toplevel()
+        self.menu_frame = Frame(self,name="menu_frame")
+        self.menu_frame.grid(row=0, columnspan=2)
+        self._create_menu_bar(self.menu_frame)
+        self._create_left_pane(top)
+        self._create_right_pane(top)
+	top.configure(menu=self.menubar)
+        self.grid_propagate(0)
+
+class EvaApplication_events(EvaApplication_gui):
+    ''' define events for analyzing eva application:
+    like listing out all objects such as Levels, Specs, etc.
+    where used feature to track object dependencies
+    export feature
+    '''
+    snap = time
+    
+    def __init__(self):
+	EvaApplication_gui.__init__(self)
+        self.ev_tree_parse_time = 0.
+	self.dbm_file =""
+	self.ev_obj_dict={}
+	self.list_box_contents=[]
+        self._define_panel_events()
+
+    def _define_panel_events(self):
+	btags = self.list_box.bindtags() 
+        self.list_box.bindtags(btags[1:] + btags[:1])
+        self.list_box.bind('<ButtonRelease-1>', self._display_contents)
+        btags = self.text_window.bindtags()
+        self.text_window.bindtags(btags[1:] + btags[:1])
+
+    def _display_contents(self, event):
+	display_list = self.ev_obj_dict[self.list_box.get('active')][1]
+	self.update_text_window(display_list)
+
+    def update_text_window(self,a_list):
+	self.text_window.delete('0.0','end')
+        for aLine in a_list:
+	    self.text_window.insert('end',aLine)
+
+    def _fill_ev_obj_dict(self):
+	for aKey in self.ev_object_listing:
+	    self.ev_obj_dict[aKey.split(':')[-1]] = [aKey.split(':')[0], self.pdb[aKey] ]
+
+    def _fill_list_box(self,a_list):
+	self.list_box_contents=[]
+	self.list_box.delete(0,END)
+	for aLine in a_list:
+	    self.list_box_contents.append(aLine)
+	    self.list_box.insert(END,aLine)
+
+    def apply_filter(self):
+	update_list=[]
+	update_list=self.list_box_contents
+	for obj_type in self.object_types:
+	   if self.show_object[obj_type].get():
+	       for eachMember in self.obj_cat_list[obj_type]:
+	           if eachMember not in self.list_box_contents:
+		       update_list.append(eachMember)
+	   else:
+	       for eachMember in self.obj_cat_list[obj_type]:
+	           if eachMember in self.list_box_contents:
+                       update_list.remove(eachMember)
+        self._fill_list_box(update_list)
+
+    def _create_filter_ev_mb(self):
+	self.show_object={}
+	self.obj_cat_list={}
+	self.filter_ev_mb.delete(1,END)
+	for obj_type in self.object_types:
+	    self.show_object[obj_type] = IntVar()
+            self.obj_cat_list[obj_type] = my_lists.split_list(my_lists.grep_list \
+		    (self.ev_object_listing,obj_type),':',1)
+	    self.filter_ev_mb.add_checkbutton(label=obj_type, variable=self.show_object[obj_type], \
+		    command=self.apply_filter)
+        
+
+    def build_dbm_tree(self):
+        a = self.snap()
+        self.eva_tree=EnvisionTree(self.eva_file_stats.file,self.eva_file_stats.dir)
+        self.eva_tree.get_file_tree()        
+        b = self.snap() 
+        self.ev_tree_parse_time = b - a
+	self.ev_object_listing = self.eva_tree.ev_object_listing
+	self.file_stats_listing = self.eva_tree.file_stats_listing
+        self.pdb=shelve.open(self.dbm_file)
+        print "Ev App processing time for ",self.eva_file,"\n",self.ev_tree_parse_time," seconds"
+
+    def open_file(self):
+	try:
+	    self.dbm_file.close()
+	except AttributeError, NameError:
+	    pass
+            # try to close dbm file if we're opening another ev application.
+        fd = selectDialog(self)
+        self.eva_file = fd.go(pattern=".*\.eva$")
+	if self.eva_file != None:
+	    self.eva_file_stats = FileUtils(self.eva_file)
+	    self.dbm_check()
+	    if not self.use_dbm: # then make one
+	        self.build_dbm_tree()
+	    else:
+	        ask = question()
+                a_title="dbm file exists"
+		a_message="Overwrite existing file? \nPath: "+self.dbm_file_stats.dir \
+		           +"\nFile: "+self.dbm_file_stats.file.split('.')[0]+'.dbm\n'
+                build_dbm = ask.go(title=a_title, message=a_message, geometry= '400x200+412+334')
+                if build_dbm:
+		    os.remove(self.dbm_file)
+		    self.build_dbm_tree()
+                else:
+                    self.pdb=shelve.open(self.dbm_file)
+                    self.ev_object_listing = self.pdb["KeyListing"] 
+		    self.file_stats_listing = self.pdb["FileStatsLog"]
+                    
+        self.evaprog_mb.entryconfig(index=self.evaprog_filter_menu_index, state=ACTIVE) #filter_ev_mb
+	self._fill_ev_obj_dict() #each key is a 2 element list
+	self.object_types=my_lists.sort_unique(my_lists.split_list(self.ev_object_listing,':'))
+	self._create_filter_ev_mb()
+        #dump object listing into listbox
+	self._fill_list_box(my_lists.split_list(self.ev_object_listing,':',1))
+
+    def dbm_check(self):
+        self.dbm_file = self.eva_file_stats.file.split('.')[0]+'.dbm'
+	self.dbm_file = self.eva_file_stats.dir+os.sep+self.dbm_file
+	self.dbm_file_stats = FileUtils(self.dbm_file)
+	if self.dbm_file_stats.file_exists:
+	    self.use_dbm = self.time_stamp_compare()
+	else:
+	    self.use_dbm = False
+    
+    def time_stamp_compare(self):
+        if self.dbm_file_stats.TimeStamp() > self.eva_file_stats.TimeStamp():
+	    return True
+	else:
+	    return False
+
+class EvaApplication(EvaApplication_events):
+    ''' wrapper for EvaApplication_gui and EvaApplication_events
+    - build dbm database of ev objects
+    - based on timestamps of eva and dbm, if built, update dbm
+    - '''
+    def __init__(self):
+	EvaApplication_events.__init__(self)
+
+    def go(self):
+        self.master.title("enVision Offline Analysis")
+        self.mainloop()
+        self.destroy()
+
+if __name__=='__main__':
+    test()

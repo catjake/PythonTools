@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE Project SYSTEM "Project-3.9.dtd">
+<!-- Project file for project EvaUic -->
+<!-- Saved: 2009-02-04, 14:21:22 -->
+<!-- Copyright (C) 2009 Bill Keezel, bill_keezel@ltx-credence.com -->
+<Project version="3.9">
+  <ProgLanguage mixed="0">Python</ProgLanguage>
+  <UIType>Other</UIType>
+  <Description>Little application to sort out various objects used in an enVision application.  Handy "WhereUsed" function to track down object dependencies.  An Import feature to remove and/or add objects from other enVision programs.</Description>
+  <Version>0.1</Version>
+  <Author>Bill Keezel</Author>
+  <Email>bill_keezel@ltx-credence.com</Email>
+  <Sources>
+    <Source>
+      <Name>eva_uic.py</Name>
+    </Source>
+    <Source>
+      <Name>ev_object_manager.py</Name>
+    </Source>
+    <Source>
+      <Name>ev_get_object.py</Name>
+    </Source>
+    <Source>
+      <Name>get_file_tree.py</Name>
+    </Source>
+    <Source>
+      <Name>analyze_eva.py</Name>
+    </Source>
+  </Sources>
+  <Forms>
+  </Forms>
+  <Translations>
+  </Translations>
+  <Interfaces>
+  </Interfaces>
+  <Others>
+  </Others>
+  <MainScript>
+    <Name>eva_uic.py</Name>
+  </MainScript>
+  <Vcs>
+    <VcsType>CVS</VcsType>
+    <VcsOptions>(dp0
+S'status'
+p1
+(lp2
+V-v
+p3
+asS'log'
+p4
+(lp5
+sS'global'
+p6
+(lp7
+V-f
+p8
+asS'update'
+p9
+(lp10
+V-dP
+p11
+asS'remove'
+p12
+(lp13
+V-f
+p14
+asS'add'
+p15
+(lp16
+sS'tag'
+p17
+(lp18
+V-c
+p19
+asS'export'
+p20
+(lp21
+sS'commit'
+p22
+(lp23
+sS'diff'
+p24
+(lp25
+V-u3
+p26
+aV-p
+p27
+asS'checkout'
+p28
+(lp29
+sS'history'
+p30
+(lp31
+V-e
+p32
+aV-a
+p33
+as.</VcsOptions>
+    <VcsOtherData>(dp0
+.</VcsOtherData>
+  </Vcs>
+  <FiletypeAssociations>
+    <FiletypeAssociation pattern="*.ui.h" type="FORMS" />
+    <FiletypeAssociation pattern="*.ui" type="FORMS" />
+    <FiletypeAssociation pattern="*.idl" type="INTERFACES" />
+    <FiletypeAssociation pattern="*.py" type="SOURCES" />
+    <FiletypeAssociation pattern="*.ptl" type="SOURCES" />
+  </FiletypeAssociations>
+</Project>
