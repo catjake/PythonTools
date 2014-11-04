@@ -1,9 +1,15 @@
+# specific files
+EVA_UIC/TriTempDict.dbm
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 
 # C extensions
 *.so
+# miscellaneous hidden config or swap type files
+.idea
+.*.swp
+*.*~
 
 # Distribution / packaging
 .Python

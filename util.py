@@ -1,15 +1,26 @@
-import re, string
-import sys, traceback, os
+import logging
+import re
+import string
+import sys
+import traceback
+import os
 import fnmatch
-import commands, getopt
+import commands
+import getopt
 import copy
 import random
-import pickle, json, csv, shutil, gzip, mmap
+import pickle
+import json
+import csv
+import shutil
+import gzip
+import mmap
 from time import localtime, time, mktime, struct_time
 from operator import itemgetter, attrgetter
 from itertools import chain, islice, tee, ifilter, ifilterfalse
 from collections import namedtuple
 from struct import pack, unpack
+from math import sqrt
 
 var = """util-> python module that contains the following classes and functions:
 m_grep ->
@@ -472,6 +483,12 @@ def calc_average(myList):
         totalSum += sum
     return ( totalSum/len(myList) )
 
+
+def calc_stdev(aList):
+    avgX = sum(aList)/len(aList)
+    sumSq = sum( pow((x - avgX), 2) for x in aList )
+    stdev = sqrt( sumSq / (len(aList) - 1) )
+    return stdev
 
 def unique_sub_list(a_list):
     return(list(iter_unique_members(a_list)))
@@ -1989,7 +2006,15 @@ class GetFileListing:
         self.output = self.sys_cmd.output
 
 
-def get_file_listing(dir_path_list=None, file_pattern="*.*"):
+def get_file_listing(dir_path_list=None, file_pattern="*.*", do_recursive=True):
+    """
+    Get file listing based on dir_path_list and file_pattern
+    :param dir_path_list:
+    :param file_pattern:
+    :param do_recursive:
+    :return:
+    """
+    #TODO: add handler for recursive function in following sub directories out of dir_path
     file_list = []
     dir_path_list = dir_path_list or [] if not isinstance(dir_path_list,str) else [dir_path_list]
     for a_path in dir_path_list:
@@ -2604,4 +2629,64 @@ class PersistentDict(dict):
             except Exception:
                 pass
         raise ValueError('File not in a supported format')
+
+
+class NewLogger(object):
+    """
+    Helper class for logging
+    """
+
+    default_log_format = "%(levelname)s::%(asctime)s:: %(message)s"
+    default_date_format = "%m/%d/%Y %H:%M:%S"
+
+    def __init__(self, logger_name="default_logger", file_name=None, stream=sys.stdout,
+                 file_log_level=logging.DEBUG, console_log_level=logging.INFO,
+                 reset_logger=True):
+        if reset_logger:
+            self.reset_logging()
+        self.file_name = os.path.abspath(file_name)
+        self.logger = self.setup_logging(logger_name, file_name, stream, file_log_level,
+                                         console_log_level)
+        self.handlers = self.logger.handlers
+
+    @staticmethod
+    def reset_logging():
+        """
+        clear out logging root
+        :return:
+        """
+        if logging.root:
+            del logging.root.handlers[:]
+
+    @staticmethod
+    def setup_logging(logger_name, fn, stdout, flog_level, clog_level,
+                      log_format=default_log_format, date_format=default_date_format):
+        """
+        Create logger and setup handlers for log file and stdout, which defaults to console (sys.stderr)
+        :rtype : logging object
+        :param logger_name:
+        :param fn:
+        :param stdout:
+        :param flog_level:
+        :param clog_level:
+        :return logger:
+        """
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)
+        formatter = logging.Formatter(fmt=log_format,
+                                      datefmt=date_format)
+
+        # create file handler
+        fh = logging.FileHandler(filename=fn, mode="w")
+        fh.setLevel(flog_level)
+        fh.setFormatter(formatter)
+
+        # create stream handler, default is console
+        ch = logging.StreamHandler(stream=stdout)
+        ch.setLevel(clog_level)
+        ch.setFormatter(formatter)
+        # add handlers to logger
+        logger.addHandler(fh)
+        logger.addHandler(ch)
+        return logger
 
