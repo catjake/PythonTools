@@ -9,13 +9,13 @@ import time
 # process the stdfs, create dlist and flist, die id records and fail logs respectively
 class ProcessStdfs:
     '''batch process stdf files that have been converted to ascii with stdf2atdf.py'''
-    def __init__(self,file_pattern='*.atd*',x_loc=0,y_loc=0,w_loc=0):
-        self.stdf_files = util.GetFileListing(file_pattern,'-1')
+    def __init__(self,dir_path_list=["./"], file_pattern='*.atd*', doRecursive=False, x_loc=0,y_loc=0,w_loc=0):
+        self.stdf_files = util.get_file_listing(dir_path_list, file_pattern, doRecursive)
         self.stdf_dict = {}
         self.parse_them(x_loc,y_loc,w_loc)
         
     def parse_them(self,x_loc=0,y_loc=0,w_loc=0):
-        for a_file in self.stdf_files.sys_cmd.output:
+        for a_file in self.stdf_files:
             print('Working on %s, started at %s'%(a_file,time.asctime()))
             snap = time.time()
             self.stdf = da.ParseStdf(a_file,x_loc,y_loc,w_loc)

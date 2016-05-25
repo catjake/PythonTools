@@ -1,8 +1,6 @@
 import util
-import random
 import mmap,os,re
 from mmap import ACCESS_READ,ACCESS_COPY,ACCESS_WRITE
-import tkFont
 from GUI.my_tkinter import append_to_list_box,fill_list_box,append_to_text_box,delete_from_list_box, \
     add_to_list_box,move_up_in_list_box, move_down_in_list_box,get_selection,add_cr,selection_index_list, \
     set_button_state
@@ -816,7 +814,10 @@ class TestAnalysis:
         self.MergeCpl, self.MergeCph, self.MergeCpk = aDict['Cpl'],aDict['Cph'],aDict['Cpk']
         for a_site in self.SiteRange:
             self.SiteAvgDelta[a_site] = self.MergeAvg-self.Avg[a_site]
+
+
 class EnvisionAsciiDlogAnalysis(PrepAsciiDlogFile):
+
     def __init__(self,file_list,start_stop=(0,-1),delimeter=',',test_num_iter=10,keep_fails=False,skip_device_id=False,\
         device_id_dict={'device_id_x':'DIEID_WAFERX_Value','device_id_y':'DIEID_WAFERY_Value',\
         'device_id_w':'DIEID_WAFERNUM_Value','DeviceIdAttributes':'device_id_x device_id_y device_id_w'.split(),\
@@ -1005,8 +1006,10 @@ class EnvisionAsciiDlogAnalysis(PrepAsciiDlogFile):
             )
     def _append_to_console(self):
         pass
+
+
 class ParseStdf:
-    '''Pass in parsed ascii stdf file, using stdf2atdf and x_loc, y_loc, and wfr_loc test numbers.'''
+    """Pass in parsed ascii stdf file, using stdf2atdf and x_loc, y_loc, and wfr_loc test numbers."""
     def __init__(self,stdf_file,x_loc,y_loc,w_loc):
         self.DieIdList, self.FailLogList = [],[]  # initialize as empty lists
         self.f = util.FileUtils(stdf_file)
@@ -1020,15 +1023,19 @@ class ParseStdf:
 
     def GetFullTestList(self):
         g = util.m_re(self.f.contents)
-        g.grep('Ptr:\d+\|')
+        g.grep('Ptr:(?P<id>\d+)\|')
         if g.pattern_count>0: 
             self.full_test_list = [ a_num.strip() for a_num in util.sort_unique(g.m_groups)]
             self.test_limits_dict= {}
             for a_line in g.lines:
-                test_num = util.my_split(a_line,'[:\|]')[1].strip()
+                a_line = re.sub("Ptr:", "", a_line)
+                test_num = util.my_split(a_line,'\|')[0].strip()
                 if not self.test_limits_dict.has_key(test_num):
-                    comment,blah1,blah2,blah3,blah4,low_limit,high_limit,units = util.my_split(a_line,'[\|:]',True)[7:15]
-                    self.test_limits_dict[test_num] = { 'LowerLimit': low_limit, 'UpperLimit':high_limit, 'Units':units, 'Comment':comment }
+                    testName, comment, blah1, blah2, blah3, blah4, blah5, low_limit, high_limit, units = \
+                        util.my_split(a_line, '[:\|]', True)[6:16]
+                    self.test_limits_dict[test_num] = {
+                        'LowerLimit': low_limit, 'UpperLimit':high_limit,
+                        'Units':units, 'Comment':comment, 'TestName':testName}
 
     def GetDieIdList(self):
         self.DieIdList=[]
@@ -1099,40 +1106,47 @@ class ParseStdf:
             b_list = b_list + g.lines
         return b_list
 
-    def GetDlogRecord(self,x_loc,y_loc,w_loc,test_list):
-        '''Get the dlog record(s) for a single die id device based on the test numbers passed in the test_list argument'''
+    def GetDlogRecord(self, x_loc, y_loc, w_loc, test_list):
+        """Get the dlog record(s) for a single die id device based on the test numbers passed in the test_list argument"""
         if type(test_list) == type('a_string'):
-            test_list = [ test_list ]
+            test_list = [test_list]
         b_list = []
         g = util.m_grep(self.DieIdList)
         g.grep(':'.join([x_loc,y_loc,w_loc]))
         if g.pattern_count>0:
             a_line = g.lines[0]
-            DieId = a_line.split('|')[0]
             SiteNum = a_line.split('|')[1].split(':')[-1]
             rec_start,rec_stop = a_line.split('|')[-1].split(':')
             rec_start,rec_stop = int(rec_start),int(rec_stop)
             b = util.m_grep(self.f.contents[rec_start:rec_stop])
             for a_test in test_list:
                  b.grep('Ptr:'+a_test+'\|\d\|'+SiteNum+'\|\d+')
-                 b_list=b_list+b.lines
+                 if b.pattern_count > 0:
+                     b_list += b.lines
+                 else:
+                     empty_record = \
+                         "Ptr:{test_num}||{site_num}|||-999|NoTest:NoTest|||||||||%7.9f|%7.9f|%7.9f|0.0|0.0\n".format(
+                             test_num=a_test, site_num=SiteNum
+                         )
+                     b_list.append(empty_record)
                  b.clear_cache()
             return b_list
         return []
 
     def GenerateDlogRecordDict(self,die_id_list,test_list):
-        '''Create a dictionary with test data for multiple devices, that can be ported to the TestAnalysis class, returns a list that can be used for this'''
+        """Create a dictionary with test data for multiple devices, that can be ported to the TestAnalysis class, returns a list that can be used for this"""
         #make a dictionary, store limits and results for a set of tests
-        a_list = [ self.GetDlogRecord(a_die.split()[0],a_die.split()[1],a_die.split()[2],test_list) for a_die in die_id_list ]
+        a_list = [ self.GetDlogRecord(a_die.split()[0], a_die.split()[1], a_die.split()[2], test_list) for a_die in die_id_list]
         #['Ptr', '10068', '1', '0', '129', '0', '1.51064316611e-08', 'Leakage_IHIL_Test nstandby 46.a28', '14', '9', '9', '9', '-1.50000005306e-07', '1.00000001169e-07', 'A', '%f', '%f', '%f', '\n']
-        list_seq = [1,3,6,7,12,13,14] 
-        self.DlogRecordDict= dict([ (util.my_split(a_line,'[:\|]')[1],{'DieId':[':'.join(die_id_list[0].split())], 'Site':[util.my_split(a_line,'[:\|]')[3]], \
-            'Result':[util.my_split(a_line,'[:\|]')[6]], 'Comment':util.my_split(a_line,'[:\|]')[7]}) for a_line in a_list[0] ])
+        list_seq = [1, 3, 6, 7, 12, 13, 14]
+        self.DlogRecordDict = {
+            testNumber: {"DieId": [], "Site": [], "Result": [], "Comment": "place holder", "TestName": "place holder"}
+            for testNumber in test_list}
+        # DEL self.DlogRecordDict= dict([ (util.my_split(a_line,'[:\|]')[1],{'DieId':[':'.join(die_id_list[0].split())], 'Site':[util.my_split(a_line,'[:\|]')[3]], \
+        # DEL    'Result':[util.my_split(a_line,'[:\|]')[6]], 'Comment':util.my_split(a_line,'[:\|]')[7]}) for a_line in a_list[0] ])
         if len(a_list)>1:
-            aRange = range(len(a_list))
-            for i in aRange[1:]:
-                a_part = a_list[i]
-                a_die = ':'.join(die_id_list[i].split())
+            for dieId, a_part in zip(die_id_list, a_list):
+                a_die = ':'.join(dieId.split())
                 for a_record in a_part:
                     a_line = util.my_split(a_record,'[:\|]',True)
                     a_test,a_result,a_site = a_line[1],a_line[6],a_line[3]
@@ -1145,10 +1159,26 @@ class ParseStdf:
             self.DlogRecordDict[a_test]['LowerLimit'] = self.test_limits_dict[a_test]['LowerLimit']
             self.DlogRecordDict[a_test]['UpperLimit'] = self.test_limits_dict[a_test]['UpperLimit']
             self.DlogRecordDict[a_test]['Units'] = self.test_limits_dict[a_test]['Units']
+            self.DlogRecordDict[a_test]['Comment'] = self.test_limits_dict[a_test]['Comment']
+            self.DlogRecordDict[a_test]['TestName'] = self.test_limits_dict[a_test]['TestName']
             for i in aRange:
-                c_list.append(':'.join([self.DlogRecordDict[a_test]['DieId'][i],a_test,self.DlogRecordDict[a_test]['Site'][i], \
-                    self.DlogRecordDict[a_test]['Result'][i],self.DlogRecordDict[a_test]['Comment'],self.DlogRecordDict[a_test]['LowerLimit'],\
-                    self.DlogRecordDict[a_test]['UpperLimit'],self.DlogRecordDict[a_test]['Units']]))
+                try:
+                    c_list.append(
+                        ':'.join([
+                            self.DlogRecordDict[a_test]['DieId'][i],
+                            a_test,
+                            self.DlogRecordDict[a_test]['TestName'],
+                            self.DlogRecordDict[a_test]['Site'][i],
+                            self.DlogRecordDict[a_test]['Result'][i],
+                            self.DlogRecordDict[a_test]['LowerLimit'],
+                            self.DlogRecordDict[a_test]['UpperLimit'],
+                            self.DlogRecordDict[a_test]['Units'],
+                            self.DlogRecordDict[a_test]['Comment'],
+                        ])
+                    )
+                except TypeError:
+                    print "i: {0} : a_test: {1}".format(i, a_test)
+                    raise
         return(c_list)
 
 '''

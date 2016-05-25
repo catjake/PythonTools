@@ -1,17 +1,6 @@
-import util
-from pyExcelerator import Workbook, Font, Borders, Alignment, XFStyle
-from tkintertable.Tables import TableCanvas
-from GUI.my_tkinter import mTableCanvas
-def Table2Csv(table,seperator=','):
-    "Export tkintertable data to a comma separated list"
-    sep = ',' if not seperator else seperator
-    model=table.getModel()
-    colnames,collabels  = model.columnNames,model.columnlabels
-    header_row = [ collabels[c] for c in colnames ]
-    recs = model.getAllCells() if not table.filtered else model.getFilteredCells()
-    a_list = [sep.join(header_row)]
-    for a_row in sorted(recs.iterkeys()): a_list.append(sep.join([a_cell for a_cell in recs[a_row]]))
-    return(a_list)
+# jk 20140313: removed tkintertable stuff and replaced pyExcelerator with xlwt
+import add_to_Utilities as util
+from xlwt import Workbook, Font, Borders, Alignment, XFStyle
 class ConvertCsv2Xls(object):
     attributes_dict = { \
         'Self':{'font': 'Font', 'borders':'Borders', 'alignment':'Alignment', 'style':'XFStyle'}, \
@@ -76,12 +65,8 @@ class ConvertCsv2Xls(object):
         if not file_name: file_name = self.file_name
         if isinstance(csv_source,util.FileEdit): #util.FileEdit instance
             csv_source_list = [ [a_row.rstrip() for a_row in f.contents] for f in csv_source.file_utils ]
-        elif isinstance(csv_source,(TableCanvas,mTableCanvas)): #tkintertable.TableCanvas or my_tkinter.mTableCanvas
-            csv_source_list = [Table2Csv(csv_source) ]
         elif isinstance(csv_source,list):
-            if isinstance(csv_source[0],(TableCanvas,mTableCanvas)):
-                csv_source_list = [ Table2Csv(a_table) for a_table in csv_source ] 
-            elif isinstance(csv_source[0],list): 
+            if isinstance(csv_source[0],list): 
                 if isinstance(csv_source[0][0],list):
                     csv_source_list = [ [','.join(a_row) for a_row in a_table] for a_table in csv_source ]
                 else: csv_source_list = csv_source

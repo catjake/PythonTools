@@ -390,7 +390,7 @@ def find_index(aList, search_param):
 
 def find_block(m_groups, start_clause, stop_clause, index_offset=0):
     found = False
-    chk_list = [ 1 if cmp(a_cell, start_clause)==0 else -1 for a_cell in m_groups ]
+    chk_list = [ 1 if re.search(start_clause, a_cell) else -1 for a_cell in m_groups ]
     chk_sum = [chk_list[0]]
     for a_num in chk_list[1:]: chk_sum.append(a_num+chk_sum[-1])
     start_index, stop_index = find_index(chk_sum,'^1\\b'), find_index(chk_sum,'^0\\b')
@@ -412,9 +412,14 @@ def find_blocks_iter(m_groups, start_clause, stop_clause, offset=0):
     start, stop = -1,-1
     while current_offset < len(m_groups):
         start, stop = find_block(m_groups[current_offset:], start_clause, stop_clause, current_offset)
-        if start>-1 and stop>-1: current_offset = stop+1
+        if start>-1 and stop>-1:
+            current_offset = find_index(m_groups[stop:], start_clause)
+            if current_offset > -1:
+                current_offset += stop
+            else:
+                current_offset = len(m_groups)
+            yield (start, stop)
         else: current_offset = len(m_groups)
-        yield (start, stop)
 
 
 def my_reverse_in_place(inp):
@@ -1183,8 +1188,8 @@ start_phrase should be a substring of block_start"""
                         print "g.pattern_count: ", self.g.pattern_count," i: ", i," closed: ", closed," start_phrase: ", start_phrase
                         print "last start_pt: ", self.start_pts[-2]," and stop_pt: ", self.end_pts[-1]
                         print "current start_pt: ", self.start_pts[-1]
-                        if (i-1) in range(len(g.coordinates)) and (i-1) in range(len(g.m_groups)):
-                            print g.coordinates[i-1],': ', g.m_groups[i-1]
+                        if (i-1) in range(len(self.g.coordinates)) and (i-1) in range(len(self.g.m_groups)):
+                            print self.g.coordinates[i-1],': ', self.g.m_groups[i-1]
                         # index -1, skips escape character, \, needed for grep function
                         closed = 0
                         i = self.g.pattern_count
@@ -1430,6 +1435,7 @@ class FileUtils(FileStats):
             return(-1)
 
     def add_cr(self, aList):
+        i = 0
         if type(aList) == type('a_string'):
             if aList[-1] != '\n': aList = aList+'\n'
         else:
@@ -1468,7 +1474,9 @@ u.sortList is the sorted list"""
     def __init__(self, a_list):
         self.List = a_list
 
-    def sort_by(self, fields=[0], delim='\s+', joint=':', do_reverse=[False], a_list=None, IncludeEmpties = True):
+    def sort_by(self, fields=None, delim='\s+', joint=':', do_reverse=None, a_list=None, IncludeEmpties = True):
+        if not fields: fields = [0]
+        if not do_reverse: do_reverse = [False]
         if not a_list: a_list = self.List
         self.sortList = [ my_split(aRow, delim, IncludeEmpties)  for aRow in a_list ]
         self.unSorted = copy.deepcopy(self.sortList)
@@ -1496,7 +1504,9 @@ u.sortList is the sorted list"""
         f, a_value = GetBaseType(a_string)
         return a_value
 
-    def old_sort_by(self, fields=[0], delim='\s+', joint=':', do_reverse=[False]):
+    def old_sort_by(self, fields=None, delim='\s+', joint=':', do_reverse=None):
+        if not fields: fields = [0]
+        if not do_reverse: do_reverse = [False]
         self.sortList = [ my_split(aRow, delim) for aRow in self.List ]
         self.unSorted = copy.deepcopy(self.sortList)
         self.sortList = [ [aMember.strip() for aMember in aRow] for aRow in self.sortList ]
@@ -1540,6 +1550,7 @@ usage: s = Scramble(aList, aSeq) -> s.scrambled
         self.scrambled = self.reSort(self.a_list, self.list_seq, self.map_dict)
 
     def reSort(self, a_list, list_sequence, map_dict):
+        scrambled = []
         ld = list_dimensions(a_list)
         if len(ld)==1:
             scrambled = do_scramble(a_list, map_dict)
@@ -1753,8 +1764,12 @@ class CollapseBlocks(CaptureBlocks):
                 else: raise
 
 
-def file_edit(data_obj, grep_regex_list=[], sub_regex_list=[], apply_fixes=False, tmp_file='/tmp/tmp_file_edit.txt', debug=False):
+def file_edit(data_obj, grep_regex_list=None, sub_regex_list=None, apply_fixes=False, tmp_file='/tmp/tmp_file_edit.txt', debug=False):
     """data_obj: FileUtils, file or gzip.GzipFile obj """
+    if not grep_regex_list: grep_regex_list = []
+    if not sub_regex_list: sub_regex_list = []
+    a_iter = []
+    file_name = "{0}_NEW".format(tmp_file)
     if isinstance(data_obj, FileUtils):
         if cmp(data_obj.contents, []): data_obj.read_from_file()
         a_iter, a_size, file_name = iter(data_obj.contents), get_list_size(data_obj.contents), data_obj.nm
@@ -2183,7 +2198,7 @@ class grep_iterator:
         return(self.search_pattern.search(a_line))
 
 
-def reset_mmap(mmap_obj, f, a_list=None, get_newline_offsets=False):
+def reset_mmap(mmap_obj=None, f=None, a_list=None, get_newline_offsets=False):
     a_list_iter = a_list
     if not a_list: # a_list = [] or None
         f.read_from_file()
