@@ -70,7 +70,7 @@ class limitsTable(object):
             for a_key in tt_keys:
                 t_dict[a_key] = a_list[test_fields_indices_dict[a_key]]
 
-    def get_limit(self, test_suite_name, test_instance, test_pin, test_mode, test_limits_dict=None):
+    def get_limit(self, test_suite_name, test_name, test_pin, test_mode, test_limits_dict=None):
         """
         Use self.test_number_lookup_table to get test_suite_name, test_instance, etc. from test_number
         test number is the key to reference the tsname which is the main key for v93k_test_limits_dict
@@ -78,7 +78,7 @@ class limitsTable(object):
         "F22".  Use PinName to get to the test mode, limits and units, i.e.
         test_limits_dict[test_suite_name][test_instance][test_pin][test_mode].
         :param test_suite_name:
-        :param test_instance:
+        :param test_name:
         :param test_pin:
         :param test_mode:
         :param test_limits_dict:
@@ -86,7 +86,7 @@ class limitsTable(object):
         """
         if not test_limits_dict:
             test_limits_dict = self.test_limits_dict
-        a_dict = test_limits_dict[test_suite_name][test_instance][test_pin]
+        a_dict = test_limits_dict[test_suite_name][test_name][test_pin]
         return a_dict[test_mode]["Usl"], a_dict[test_mode]["Lsl"], a_dict["Units"]
 
     def create_limits_file(self, file_name, header=None, test_limits_dict=None, test_suite_list=None):
@@ -161,6 +161,24 @@ class m_limitsTable(object):
                         }
 
 
+def get_limit(test_suite_name, test_name, test_pin, test_mode, test_limits_dict):
+    """
+    Use test_number_lookup_table to get test_suite_name, test_name, etc. from test_number
+    test number is the key to reference the tsname which is the main key for v93k_test_limits_dict
+    upper and lower limits are Lsl and Usl, which are accessed from the test category key name, i.e.
+    "F22".  Use PinName to get to the test mode, limits and units, i.e.
+    test_limits_dict[test_suite_name][test_instance][test_pin][test_mode].
+    :param test_suite_name:
+    :param test_name:
+    :param test_pin:
+    :param test_mode:
+    :param test_limits_dict:
+    :return:
+    """
+    a_dict = test_limits_dict[test_suite_name][test_name][test_pin]
+    return a_dict[test_mode]["Usl"], a_dict[test_mode]["Lsl"], a_dict["Units"]
+
+
 def create_limits_table(file_name, header=None, end_test_table_fields=None, test_limits_dict=None, test_suite_list=None):
     """
     create limits table object
@@ -202,3 +220,19 @@ def get_missing_test_numbers(a_dict, logged_test_numbers):
             tnum_list.append(int(r_dict["Test number"]))
     missing = list(set(tnum_list) - set(logged_test_numbers))
     return missing, tnum_list
+
+
+def get_test_info(test_number, lookup_dict, test_limits_dict, test_mode):
+    """
+    wrapper helper function for get_limits, generates **kargs to be used for
+    invoking get_limits
+    :param test_number:
+    :param lookup_dict:
+    :param test_limits_dict:
+    :param test_mode:
+    :return:
+    """
+    get_limit_args = ["test_suite_name", "test_name", "test_pin", "test_mode", "test_limits_dict"]
+    a_dict = lookup_dict[test_number]
+    get_limit_entries = [a_dict["tsname"], a_dict["tname"], a_dict["tpin"], test_mode, test_limits_dict]
+    return dict([(a, b) for a, b in zip(get_limit_args, get_limit_entries)])
